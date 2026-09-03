@@ -84,7 +84,7 @@ Browser / Client (Desktop / Mobile)
        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ Next.js 16 Frontend Layer                                   │
-│  ├── App Router (14 Static & Dynamic Routes)                │
+│  ├── App Router (13 Static & Dynamic Routes)                │
 │  ├── Reusable UI Component Primitives & Domain Features     │
 │  ├── Domain Service Layer (auth, client, invoice, etc.)     │
 │  └── Central API Client (Bearer Token Interception & Error) │
@@ -258,7 +258,7 @@ The backend recalculates authoritative financial values rather than trusting cli
 - **Public Token Security**: Cryptographically secure URL-safe public invoice tokens generated using Python's `secrets` module (`secrets.token_urlsafe(32)`).
 - **Public Response Privacy**: Responses explicitly strip internal database UUIDs (`id`, `user_id`, `client_id`, `item_id`) and public token references. Draft invoices return `404 Not Found`.
 - **Payment Row Locking**: PostgreSQL `SELECT ... FOR UPDATE` row-level locks prevent race conditions and duplicate settlements during concurrent payment attempts.
-- **Logo Upload Validation**: Strict 2 MB file size caps, MIME verification (`image/png`, `image/jpeg`, `image/webp`), and deep binary Pillow image parsing to prevent corrupted or malicious uploads.
+- **Logo Upload Validation**: Strict 2 MB file size caps, MIME verification (`image/png`, `image/jpeg`, `image/webp`), and deep binary Pillow image parsing to validate image structure, dimensions, and supported formats.
 - **Environment Secrets**: Backend secrets (`DATABASE_URL`, `JWT_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) are kept strictly within `backend/.env` and are never exposed to the frontend or version control.
 
 ---
@@ -341,8 +341,8 @@ python --version
 Clone the repository and enter the project directory:
 
 ```powershell
-git clone <repository-url>
-cd Billflow
+git clone https://github.com/srikanthraj9/billflow-invoicing.git
+cd billflow-invoicing
 ```
 
 ---
@@ -564,9 +564,9 @@ npm test
 
 # Or run individual test suites:
 npm run test:auth          # Stage 8A: Auth & Bearer Tokens (15 checks)
-npm run test:clients       # Stage 8B: Client CRUD & Search (22 checks)
+npm run test:clients       # Stage 8B: Client CRUD & Search (21 checks)
 npm run test:invoices      # Stage 8C: Invoice Calculations & State Machine (37 checks)
-npm run test:public        # Stage 8D: Public Portal & Payment Simulation (26 checks)
+npm run test:public        # Stage 8D: Public Portal & Payment Simulation (27 checks)
 npm run test:dashboard     # Stage 8E: Dashboard KPIs & Revenue Timeline (25 checks)
 npm run test:settings      # Stage 8F: Settings & Logo Storage (39 checks)
 npm run test:fullstack     # Stage 8G: Full-Stack End-to-End QA (38 checks)
@@ -593,7 +593,7 @@ npm run build
 - **Combined Automated Checks**: 330 / 330 passed
 - **TypeScript Errors**: 0
 - **ESLint Errors**: 0
-- **Production Build**: PASS (all 14 static and dynamic routes compiled)
+- **Production Build**: PASS (all 13 application routes compiled successfully)
 
 ---
 
