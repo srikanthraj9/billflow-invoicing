@@ -703,10 +703,40 @@ npm : The term 'npm' is not recognized...
 ## Deployment Notes
 
 - **Application Status**: The codebase is fully verified, regression-tested, and **READY FOR PRODUCTION DEPLOYMENT**. Actual hosting deployment has not yet been performed.
-- **Frontend Hosting**: Ready for deployment to Vercel, Cloudflare Pages, or Node.js containers.
-- **Backend Hosting**: Ready for deployment to Render, Railway, Fly.io, or AWS ECS.
-- **Production CORS**: Update `allow_origins` in `backend/app/main.py` with your exact production domain prior to deployment.
-- **Supabase Storage**: Ensure the `billflow-logos` bucket exists in your production Supabase project and is configured with public read access.
+
+### Render Free Deployment Guide
+
+#### 1. Backend Web Service (FastAPI)
+Configure a new **Web Service** on Render connected to your GitHub repository:
+- **Environment**: Python 3
+- **Root Directory**: `backend`
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- **Health Check Path**: `/api/health`
+- **Environment Variables** (configure securely in Render Dashboard):
+  - `DATABASE_URL`: PostgreSQL connection string from Supabase (e.g. `postgresql+psycopg://...`)
+  - `DIRECT_URL`: Direct PostgreSQL connection string
+  - `JWT_SECRET_KEY`: Random 64-character hex secret
+  - `JWT_ALGORITHM`: `HS256`
+  - `ACCESS_TOKEN_EXPIRE_MINUTES`: `60`
+  - `SUPABASE_URL`: Your Supabase project URL (e.g. `https://<project-ref>.supabase.co`)
+  - `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role secret key
+  - `SUPABASE_STORAGE_BUCKET`: `billflow-logos`
+  - `FRONTEND_URL`: Your Render frontend URL (e.g. `https://<your-frontend>.onrender.com`)
+
+#### 2. Frontend Web Service (Next.js)
+Configure a second **Web Service** on Render:
+- **Environment**: Node
+- **Root Directory**: `frontend`
+- **Build Command**: `npm install && npm run build`
+- **Start Command**: `npm start`
+- **Environment Variables** (configure securely in Render Dashboard):
+  - `NEXT_PUBLIC_API_BASE_URL`: Your Render backend service URL + `/api` (e.g. `https://<your-backend>.onrender.com/api`)
+
+> [!IMPORTANT]
+> All credentials, keys, and connection strings must be entered directly in the Render Dashboard's **Environment** tab. Never commit secrets to source control.
+
+- **Supabase Storage**: Ensure the `billflow-logos` bucket exists in your Supabase project and has public read access enabled for logo rendering.
 
 ---
 

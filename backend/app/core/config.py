@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_STORAGE_BUCKET: str = "billflow-logos"
 
+    # Frontend CORS Configuration (Render and Production)
+    FRONTEND_URL: str | None = None
+    CORS_ORIGINS: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -27,9 +31,26 @@ class Settings(BaseSettings):
     )
 
     @property
+    def cors_origins_list(self) -> list[str]:
+        origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+        if self.FRONTEND_URL:
+            for url in self.FRONTEND_URL.split(","):
+                clean = url.strip().rstrip("/")
+                if clean and clean not in origins:
+                    origins.append(clean)
+        if self.CORS_ORIGINS:
+            for url in self.CORS_ORIGINS.split(","):
+                clean = url.strip().rstrip("/")
+                if clean and clean not in origins:
+                    origins.append(clean)
+        return origins
+
+    @property
     def sync_database_url(self) -> str:
         url = self.DATABASE_URL
-        if url.startswith("postgresql://"):
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql+psycopg://", 1)
+        elif url.startswith("postgresql://"):
             url = url.replace("postgresql://", "postgresql+psycopg://", 1)
         import re
         url = re.sub(r'([?&])pgbouncer=[^&]*(&?)', lambda m: m.group(1) if (m.group(1) == '?' and m.group(2)) else ('&' if m.group(2) else ''), url).rstrip('?&')
@@ -38,7 +59,9 @@ class Settings(BaseSettings):
     @property
     def sync_direct_url(self) -> str:
         url = self.DIRECT_URL or self.DATABASE_URL
-        if url.startswith("postgresql://"):
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql+psycopg://", 1)
+        elif url.startswith("postgresql://"):
             url = url.replace("postgresql://", "postgresql+psycopg://", 1)
         import re
         url = re.sub(r'([?&])pgbouncer=[^&]*(&?)', lambda m: m.group(1) if (m.group(1) == '?' and m.group(2)) else ('&' if m.group(2) else ''), url).rstrip('?&')
