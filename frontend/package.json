@@ -1,0 +1,41 @@
+{
+  "name": "billflow",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "node tests/run-all-tests.mjs",
+    "test:all": "node tests/run-all-tests.mjs",
+    "test:auth": "npx tsx tests/test-auth-integration.ts",
+    "test:clients": "npx tsx tests/test-client-integration.ts",
+    "test:invoices": "npx tsx tests/test-invoice-integration.ts",
+    "test:public": "npx tsx tests/test-public-invoice-integration.ts",
+    "test:dashboard": "npx tsx tests/test-dashboard-integration.ts",
+    "test:settings": "npx tsx tests/test-settings-integration.ts",
+    "test:fullstack": "npx tsx tests/test-fullstack-qa.ts"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.39.0",
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-hook-form": "^7.87.0",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
