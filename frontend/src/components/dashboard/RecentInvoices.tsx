@@ -56,7 +56,7 @@ export function RecentInvoices({ invoices }: RecentInvoicesProps) {
       <CardContent className="p-0 sm:p-0">
         {/* Desktop Table View */}
         <div className="hidden md:block">
-          <Table className="border-0 rounded-none border-t border-slate-100">
+          <Table containerClassName="border-0 rounded-none border-t border-slate-100">
             <TableHeader>
               <TableRow className="bg-slate-50/60">
                 <TableHead className="w-32">Invoice</TableHead>

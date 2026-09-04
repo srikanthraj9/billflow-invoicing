@@ -108,10 +108,13 @@ export function InvoiceSummary({
           )}
         </div>
 
-        {/* Final Total */}
-        <div className="pt-3 border-t border-slate-300/80 flex items-baseline justify-between">
-          <span className="text-sm sm:text-base font-bold text-slate-900">Total Due:</span>
-          <span className="text-xl sm:text-2xl font-bold text-indigo-700 tabular-nums">
+        {/* Final Total Box */}
+        <div className="mt-3 flex items-center justify-between p-3.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
+          <div>
+            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">Total Due</span>
+            <span className="text-[11px] text-slate-500 font-normal">All taxes & discounts applied</span>
+          </div>
+          <span className="text-xl sm:text-2xl font-extrabold text-indigo-600 tabular-nums tracking-tight">
             {formatCurrency(totals.totalAmount, currency)}
           </span>
         </div>

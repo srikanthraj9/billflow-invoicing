@@ -227,7 +227,7 @@ export function IncomeChart({ data, currency = 'INR' }: IncomeChartProps) {
                 >
                   {/* Value tooltip pill on hover */}
                   <div
-                    className={`mb-2 rounded bg-slate-900 text-white text-[10px] font-semibold px-1.5 py-0.5 whitespace-nowrap transition-all duration-150 ${
+                    className={`mb-2 rounded-md bg-slate-900 text-white text-[10px] font-semibold px-2 py-0.5 whitespace-nowrap shadow-md shadow-slate-900/20 z-10 transition-all duration-150 ${
                       isHovered
                         ? 'opacity-100 translate-y-0 scale-100'
                         : 'opacity-0 translate-y-1 scale-95 pointer-events-none'
@@ -237,7 +237,7 @@ export function IncomeChart({ data, currency = 'INR' }: IncomeChartProps) {
                   </div>
 
                   {/* Bar Column Track */}
-                  <div className="w-full max-w-[42px] h-28 sm:h-36 bg-slate-100/90 rounded-t-lg relative flex items-end overflow-hidden">
+                  <div className="w-full max-w-[42px] h-28 sm:h-36 bg-slate-100/90 rounded-t-lg relative flex items-end overflow-hidden group-hover:bg-slate-200/60 transition-colors">
                     <div
                       className={`w-full rounded-t-lg transition-all duration-300 ${
                         item.amount > 0
