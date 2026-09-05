@@ -6,6 +6,7 @@
  */
 
 import { apiClient } from '../api-client';
+import { getAuthToken } from '../auth-token';
 import { BusinessSettings, CurrencyCode } from '../types';
 
 interface BackendSettingsResponse {
@@ -59,13 +60,34 @@ function normalizeSettings(res: BackendSettingsResponse): BusinessSettings {
   };
 }
 
+let inFlightSettingsPromise: Promise<BusinessSettings> | null = null;
+let inFlightToken: string | null = null;
+
 export const settingsService = {
   /**
    * Retrieves the authenticated merchant's business settings.
+   * Uses in-flight deduplication so concurrent requests share a single network call,
+   * while ensuring multi-tenant isolation and immediate 401 on unauthenticated calls.
    */
   async getSettings(): Promise<BusinessSettings> {
-    const response = await apiClient.get<BackendSettingsResponse>('/settings');
-    return normalizeSettings(response);
+    const currentToken = getAuthToken();
+
+    if (inFlightSettingsPromise && inFlightToken === currentToken) {
+      return inFlightSettingsPromise;
+    }
+
+    inFlightToken = currentToken;
+    inFlightSettingsPromise = (async () => {
+      try {
+        const response = await apiClient.get<BackendSettingsResponse>('/settings');
+        return normalizeSettings(response);
+      } finally {
+        inFlightSettingsPromise = null;
+        inFlightToken = null;
+      }
+    })();
+
+    return inFlightSettingsPromise;
   },
 
   /**
@@ -87,6 +109,8 @@ export const settingsService = {
       default_payment_terms: data.defaultPaymentTermsDays !== undefined ? Number(data.defaultPaymentTermsDays) : current.defaultPaymentTermsDays,
     };
 
+    inFlightSettingsPromise = null;
+    inFlightToken = null;
     const response = await apiClient.put<BackendSettingsResponse>('/settings', payload);
     return normalizeSettings(response);
   },
@@ -99,6 +123,8 @@ export const settingsService = {
     const formData = new FormData();
     formData.append('file', file);
 
+    inFlightSettingsPromise = null;
+    inFlightToken = null;
     const response = await apiClient.post<BackendLogoResponse>('/settings/logo', formData);
     return response.logoUrl || response.logo_url || '';
   },
@@ -107,6 +133,16 @@ export const settingsService = {
    * Idempotently deletes the business logo via DELETE /api/settings/logo.
    */
   async deleteLogo(): Promise<void> {
+    inFlightSettingsPromise = null;
+    inFlightToken = null;
     await apiClient.delete<void>('/settings/logo');
+  },
+
+  /**
+   * Clears any in-flight settings promise.
+   */
+  clearSettingsCache(): void {
+    inFlightSettingsPromise = null;
+    inFlightToken = null;
   },
 };

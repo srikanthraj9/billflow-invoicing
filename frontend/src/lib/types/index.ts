@@ -62,6 +62,8 @@ export interface Invoice {
   status: InvoiceStatus;
   sentAt?: string;
   paidAt?: string;
+  paymentMethod?: string;
+  paymentReference?: string;
   createdAt: string;
   updatedAt: string;
 }

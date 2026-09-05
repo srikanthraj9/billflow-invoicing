@@ -6,6 +6,7 @@
  */
 
 import { apiClient, ApiError } from '../api-client';
+import { getAuthToken } from '../auth-token';
 import { CurrencyCode, Invoice, InvoiceFilters, InvoiceItem, InvoiceStatus } from '../types';
 
 interface BackendClientSummary {
@@ -60,37 +61,43 @@ interface BackendSettingsResponse {
 }
 
 let cachedTotalCount = 0;
+let inFlightInvoicesPromise: Promise<{ items: Invoice[]; total: number }> | null = null;
+let inFlightInvoicesKey = '';
+const invoiceCache = new Map<string, { data: { items: Invoice[]; total: number }; timestamp: number }>();
+const INVOICE_CACHE_TTL_MS = 10000;
 
-function normalizeInvoice(b: BackendInvoiceResponse, currency: CurrencyCode = 'INR'): Invoice {
-  const items: InvoiceItem[] = (b.items || []).map((item) => ({
-    id: item.id,
+function normalizeInvoice(b: any, currency: CurrencyCode = 'INR', fallbackToken?: string): Invoice {
+  const items: InvoiceItem[] = (b.items || []).map((item: any, idx: number) => ({
+    id: item.id || `item-${idx + 1}`,
     description: item.description,
     quantity: Number(item.quantity),
     rate: Number(item.rate),
     amount: Number(item.amount),
   }));
 
-  const subtotal = Number(b.subtotal);
-  const discountAmount = Number(b.discount);
-  const taxAmount = Number(b.tax);
-  const totalAmount = Number(b.total);
+  const subtotal = Number(b.subtotal || 0);
+  const discountAmount = Number(b.discount || 0);
+  const taxAmount = Number(b.tax || 0);
+  const totalAmount = Number(b.total || 0);
 
   // Compute discount and tax percentages for UX display if applicable
   const discountPercentage = subtotal > 0 ? (discountAmount / subtotal) * 100 : 0;
   const taxableBase = subtotal - discountAmount;
   const taxPercentage = taxableBase > 0 ? (taxAmount / taxableBase) * 100 : 0;
 
+  const invCurrency = (b.currency as CurrencyCode) || currency;
+
   return {
-    id: b.id,
+    id: b.id || fallbackToken || b.invoice_number || '',
     invoiceNumber: b.invoice_number,
-    token: b.public_token || '',
-    clientId: b.client_id,
-    clientName: b.client?.name || 'Unknown Client',
+    token: b.public_token || fallbackToken || '',
+    clientId: b.client_id || '',
+    clientName: b.client?.name || 'Valued Client',
     clientEmail: b.client?.email || '',
     clientCompany: b.client?.company || undefined,
     clientAddress: b.client?.address || undefined,
-    issueDate: b.issue_date,
-    dueDate: b.due_date,
+    issueDate: typeof b.issue_date === 'string' ? b.issue_date : (b.issue_date ? new Date(b.issue_date).toISOString().split('T')[0] : ''),
+    dueDate: typeof b.due_date === 'string' ? b.due_date : (b.due_date ? new Date(b.due_date).toISOString().split('T')[0] : ''),
     items,
     subtotal,
     discountPercentage: Math.round(discountPercentage * 100) / 100,
@@ -98,12 +105,12 @@ function normalizeInvoice(b: BackendInvoiceResponse, currency: CurrencyCode = 'I
     taxPercentage: Math.round(taxPercentage * 100) / 100,
     taxAmount,
     totalAmount,
-    currency,
+    currency: invCurrency,
     notes: b.notes || undefined,
     status: b.status as InvoiceStatus,
     paidAt: b.paid_at || undefined,
-    createdAt: b.created_at,
-    updatedAt: b.updated_at,
+    createdAt: b.created_at || new Date().toISOString(),
+    updatedAt: b.updated_at || new Date().toISOString(),
   };
 }
 
@@ -118,9 +125,11 @@ export type CreateInvoiceInput = Omit<
 
 export const invoiceService = {
   /**
-   * Fetches all invoices with server-side search, status filter, client filter, and sorting.
+   * Fetches all invoices with server-side search, status filter, client filter, and sorting,
+   * returning both the normalized invoices and the authoritative total count in a single request.
+   * Uses token-safe in-flight deduplication so concurrent callers share a single network request.
    */
-  async getInvoices(filters?: InvoiceFilters): Promise<Invoice[]> {
+  async getInvoicesWithMetadata(filters?: InvoiceFilters): Promise<{ items: Invoice[]; total: number }> {
     const params: Record<string, string | number | boolean | undefined | null> = {
       limit: 100,
       offset: 0,
@@ -144,30 +153,54 @@ export const invoiceService = {
       params.sort_by = 'newest';
     }
 
-    const response = await apiClient.get<BackendInvoiceListResponse>('/invoices', {
-      params,
-    });
+    const currentToken = getAuthToken();
+    const key = `${currentToken || 'anon'}:${JSON.stringify(params)}`;
 
-    cachedTotalCount = response.total;
-    return response.items.map((i) => normalizeInvoice(i));
+    const cached = invoiceCache.get(key);
+    if (cached && Date.now() - cached.timestamp < INVOICE_CACHE_TTL_MS) {
+      return cached.data;
+    }
+
+    if (inFlightInvoicesPromise && inFlightInvoicesKey === key) {
+      return inFlightInvoicesPromise;
+    }
+
+    inFlightInvoicesKey = key;
+    inFlightInvoicesPromise = (async () => {
+      try {
+        const response = await apiClient.get<BackendInvoiceListResponse>('/invoices', {
+          params,
+        });
+
+        cachedTotalCount = response.total;
+        const result = {
+          items: response.items.map((i) => normalizeInvoice(i)),
+          total: response.total,
+        };
+        invoiceCache.set(key, { data: result, timestamp: Date.now() });
+        return result;
+      } finally {
+        inFlightInvoicesPromise = null;
+        inFlightInvoicesKey = '';
+      }
+    })();
+
+    return inFlightInvoicesPromise;
+  },
+
+  /**
+   * Fetches all invoices with server-side search, status filter, client filter, and sorting.
+   */
+  async getInvoices(filters?: InvoiceFilters): Promise<Invoice[]> {
+    const res = await this.getInvoicesWithMetadata(filters);
+    return res.items;
   },
 
   /**
    * Returns total count of all stored invoices for the current user.
    */
   async getTotalCount(): Promise<number> {
-    if (cachedTotalCount > 0) {
-      return cachedTotalCount;
-    }
-    try {
-      const response = await apiClient.get<BackendInvoiceListResponse>('/invoices', {
-        params: { limit: 1 },
-      });
-      cachedTotalCount = response.total;
-      return cachedTotalCount;
-    } catch {
-      return 0;
-    }
+    return cachedTotalCount;
   },
 
   /**
@@ -231,7 +264,7 @@ export const invoiceService = {
       const response = await apiClient.get<BackendInvoiceResponse>(`/public/invoices/${token}`, {
         skipAuth: true,
       });
-      return normalizeInvoice(response);
+      return normalizeInvoice(response, 'INR', token);
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         return null;
@@ -282,6 +315,9 @@ export const invoiceService = {
       payload.tax_percentage = data.taxPercentage;
     }
 
+    inFlightInvoicesPromise = null;
+    inFlightInvoicesKey = '';
+    invoiceCache.clear();
     const response = await apiClient.post<BackendInvoiceResponse>('/invoices', payload);
     cachedTotalCount++;
     return normalizeInvoice(response, data.currency);
@@ -322,29 +358,47 @@ export const invoiceService = {
       }));
     }
 
+    inFlightInvoicesPromise = null;
+    inFlightInvoicesKey = '';
+    invoiceCache.clear();
     const response = await apiClient.put<BackendInvoiceResponse>(`/invoices/${id}`, payload);
     return normalizeInvoice(response);
   },
 
   /**
    * Simulates payment for public invoice.
-   * Kept for client portal until Stage 8D.
+   * Consumes the authoritative backend response from POST /api/public/invoices/{token}/pay.
    */
   async payInvoice(tokenOrId: string): Promise<Invoice> {
+    inFlightInvoicesPromise = null;
+    inFlightInvoicesKey = '';
+    invoiceCache.clear();
     const response = await apiClient.post<BackendInvoiceResponse>(
       `/public/invoices/${tokenOrId}/pay`,
       {},
       { skipAuth: true }
     );
-    return normalizeInvoice(response);
+    return normalizeInvoice(response, 'INR', tokenOrId);
   },
 
   /**
    * Deletes a draft invoice via DELETE /api/invoices/{id}.
    */
   async deleteInvoice(id: string): Promise<boolean> {
+    inFlightInvoicesPromise = null;
+    inFlightInvoicesKey = '';
+    invoiceCache.clear();
     await apiClient.delete<void>(`/invoices/${id}`);
     if (cachedTotalCount > 0) cachedTotalCount--;
     return true;
+  },
+
+  /**
+   * Clears any active in-flight or cached invoice query.
+   */
+  clearInvoiceCache(): void {
+    inFlightInvoicesPromise = null;
+    inFlightInvoicesKey = '';
+    invoiceCache.clear();
   },
 };

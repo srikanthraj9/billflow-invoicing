@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from app.models.user import User
     from app.models.client import Client
     from app.models.invoice_item import InvoiceItem
+    from app.models.payment import Payment
 
 
 class Invoice(Base):
@@ -128,4 +129,10 @@ class Invoice(Base):
         back_populates="invoice",
         cascade="all, delete-orphan",
         order_by="InvoiceItem.created_at",
+    )
+    payments: Mapped[List["Payment"]] = relationship(
+        "Payment",
+        back_populates="invoice",
+        cascade="all, delete-orphan",
+        order_by="Payment.created_at.desc()",
     )

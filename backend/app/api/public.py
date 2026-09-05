@@ -1,7 +1,9 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.schemas.payment import PaymentCreateRequest
 from app.schemas.public_invoice import PublicInvoiceResponse
 from app.services.public_invoice import (
     get_public_invoice_by_token,
@@ -38,20 +40,21 @@ def get_public_invoice(
     "/{token}/pay",
     response_model=PublicInvoiceResponse,
     status_code=status.HTTP_200_OK,
-    summary="Simulate payment for public invoice",
+    summary="Pay public invoice",
 )
 def pay_public_invoice_endpoint(
     token: str,
+    payment_data: Optional[PaymentCreateRequest] = None,
     db: Session = Depends(get_db),
 ):
     """
-    Simulated public payment endpoint.
+    Public payment endpoint.
     - No JWT authentication required.
-    - No payment credentials accepted or stored.
-    - Row-level lock (SELECT ... FOR UPDATE) ensures concurrency safety and prevents double-processing.
-    - Transitions sent/overdue invoice to paid and stamps current UTC datetime in paid_at.
+    - No sensitive banking credentials accepted or stored.
+    - Row-level lock (SELECT ... FOR UPDATE) ensures concurrency safety and prevents double payment.
+    - Atomically creates payment record and transitions invoice to paid with server UTC timestamp.
     - Rejects paid invoices with HTTP 400.
     - Rejects draft/unknown invoices with HTTP 404.
-    - Returns updated public invoice response.
+    - Returns updated authoritative public invoice response.
     """
-    return pay_public_invoice(db=db, token=token)
+    return pay_public_invoice(db=db, token=token, payment_data=payment_data)

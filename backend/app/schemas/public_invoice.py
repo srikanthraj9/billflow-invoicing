@@ -46,6 +46,8 @@ class PublicInvoiceResponse(BaseModel):
     tax: Decimal
     total: Decimal
     paid_at: Optional[datetime] = None
+    payment_method: Optional[str] = None
+    payment_reference: Optional[str] = None
     items: List[PublicInvoiceItemResponse]
     client: PublicClientResponse
     business: PublicBusinessResponse

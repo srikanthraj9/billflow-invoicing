@@ -7,6 +7,9 @@ import {
   LayoutDashboard,
   FileText,
   Users,
+  CreditCard,
+  Building2,
+  BarChart3,
   Settings,
   LogOut,
   Receipt,
@@ -26,6 +29,9 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Invoices', href: '/invoices', icon: FileText },
   { label: 'Clients', href: '/clients', icon: Users },
+  { label: 'Payments', href: '/payments', icon: CreditCard },
+  { label: 'Bank Accounts', href: '/bank-accounts', icon: Building2 },
+  { label: 'Reports', href: '/reports', icon: BarChart3 },
   { label: 'Settings', href: '/settings', icon: Settings },
 ];
 
@@ -76,10 +82,10 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150',
+                'group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-150',
                 isActive
-                  ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900'
+                  ? 'bg-indigo-50/90 text-indigo-700 font-semibold border border-indigo-100/70 shadow-2xs'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent'
               )}
             >
               <Icon
@@ -90,7 +96,7 @@ export function Sidebar() {
               />
               <span>{item.label}</span>
               {isActive && (
-                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-600" aria-hidden="true" />
+                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-600 ring-2 ring-indigo-200/70" aria-hidden="true" />
               )}
             </Link>
           );
@@ -98,8 +104,8 @@ export function Sidebar() {
       </nav>
 
       {/* Free Tier / Pro Indicator */}
-      <div className="px-4 py-3 mx-3 mb-3 rounded-xl bg-gradient-to-br from-slate-50 to-indigo-50/50 border border-slate-200/80">
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-900">
+      <div className="px-3.5 py-3 mx-3 mb-3 rounded-xl bg-slate-50/80 border border-slate-200/80 shadow-2xs">
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
           <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
           <span>Freelancer Plan</span>
         </div>
@@ -110,9 +116,9 @@ export function Sidebar() {
 
       {/* User Footer */}
       <div className="border-t border-slate-100 p-3">
-        <div className="flex items-center justify-between rounded-lg p-2 hover:bg-slate-50 transition-colors">
+        <div className="flex items-center justify-between rounded-xl p-2 hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
           <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 font-semibold text-xs">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-700 font-bold text-xs border border-indigo-100/80">
               {(user?.name || 'U').charAt(0).toUpperCase()}
             </div>
             <div className="truncate">
@@ -123,7 +129,7 @@ export function Sidebar() {
           <button
             type="button"
             onClick={handleLogout}
-            className="rounded-md p-1.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 focus:outline-none cursor-pointer"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             title="Log out"
             aria-label="Log out"
           >

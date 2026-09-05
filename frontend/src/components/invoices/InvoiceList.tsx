@@ -65,21 +65,41 @@ export function InvoiceList() {
 
   // Load clients once for filter dropdown
   React.useEffect(() => {
-    clientService.getClients().then(setClients).catch(() => {});
+    let isMounted = true;
+    clientService.getClients().then((c) => {
+      if (isMounted) setClients(c);
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Fetch invoices through service layer simulating server-side filtering
+  // Fetch invoices through service layer with single query returning items and total
   const fetchInvoices = React.useCallback(async (activeFilters: InvoiceFilters) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const [fetchedInvoices, total] = await Promise.all([
-        invoiceService.getInvoices(activeFilters),
-        invoiceService.getTotalCount(),
-      ]);
+      const { items: fetchedInvoices, total } = await invoiceService.getInvoicesWithMetadata(activeFilters);
       setInvoices(fetchedInvoices);
       setTotalCount(total);
+
+      // Compute status distribution from loaded data when in default view
+      if (!activeFilters.status || activeFilters.status === 'all') {
+        const counts: Record<InvoiceStatus | 'all', number> = {
+          all: total,
+          draft: 0,
+          sent: 0,
+          paid: 0,
+          overdue: 0,
+        };
+        fetchedInvoices.forEach((inv) => {
+          if (inv.status in counts) {
+            counts[inv.status as InvoiceStatus]++;
+          }
+        });
+        setStatusCounts(counts);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unable to load invoices.';
       setError(msg);
@@ -88,47 +108,12 @@ export function InvoiceList() {
     }
   }, []);
 
-  // Compute status distribution for filter count badges
-  const loadStatusCounts = React.useCallback(async () => {
-    try {
-      const allInvoices = await invoiceService.getInvoices();
-      const counts: Record<InvoiceStatus | 'all', number> = {
-        all: allInvoices.length,
-        draft: 0,
-        sent: 0,
-        paid: 0,
-        overdue: 0,
-      };
-      allInvoices.forEach((inv) => {
-        if (inv.status in counts) {
-          counts[inv.status as InvoiceStatus]++;
-        }
-      });
-      setStatusCounts(counts);
-    } catch {
-      // Continue gracefully if network error
-    }
-  }, []);
-
-  React.useEffect(() => {
-    loadStatusCounts();
-  }, [loadStatusCounts]);
-
   React.useEffect(() => {
     fetchInvoices(filters);
   }, [fetchInvoices, filters]);
 
   const handleFilterChange = (newFilters: Partial<InvoiceFilters>) => {
-    setFilters((prev) => {
-      const updated = { ...prev, ...newFilters };
-      // Update URL query state cleanly
-      const params = new URLSearchParams();
-      if (updated.status && updated.status !== 'all') params.set('status', updated.status);
-      if (updated.clientId) params.set('clientId', updated.clientId);
-      const queryStr = params.toString();
-      router.replace(queryStr ? `/invoices?${queryStr}` : '/invoices');
-      return updated;
-    });
+    setFilters((prev) => ({ ...prev, ...newFilters }));
   };
 
   const handleClearFilters = () => {
@@ -138,7 +123,6 @@ export function InvoiceList() {
       search: '',
       sortBy: 'newest',
     });
-    router.replace('/invoices');
   };
 
   const isFiltered = Boolean(

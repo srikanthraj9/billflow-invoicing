@@ -24,7 +24,7 @@ export function InvoiceCard({ invoice }: InvoiceCardProps) {
             {invoice.invoiceNumber}
           </Link>
           <Badge variant={invoice.status} size="sm">
-            {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+            {invoice.status === 'paid' ? '✓ PAID' : invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
           </Badge>
         </div>
 

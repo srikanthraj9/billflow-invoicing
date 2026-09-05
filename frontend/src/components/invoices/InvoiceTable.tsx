@@ -69,7 +69,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
               {/* Status Badge */}
               <TableCell className="text-center">
                 <Badge variant={inv.status} size="sm">
-                  {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
+                  {inv.status === 'paid' ? '✓ PAID' : inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
                 </Badge>
               </TableCell>
 

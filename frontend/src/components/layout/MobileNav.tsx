@@ -7,6 +7,9 @@ import {
   LayoutDashboard,
   FileText,
   Users,
+  CreditCard,
+  Building2,
+  BarChart3,
   Settings,
   LogOut,
   Receipt,
@@ -25,6 +28,9 @@ const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Invoices', href: '/invoices', icon: FileText },
   { label: 'Clients', href: '/clients', icon: Users },
+  { label: 'Payments', href: '/payments', icon: CreditCard },
+  { label: 'Bank Accounts', href: '/bank-accounts', icon: Building2 },
+  { label: 'Reports', href: '/reports', icon: BarChart3 },
   { label: 'Settings', href: '/settings', icon: Settings },
 ];
 

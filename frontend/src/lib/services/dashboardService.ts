@@ -6,6 +6,7 @@
  */
 
 import { apiClient } from '../api-client';
+import { getAuthToken } from '../auth-token';
 import { CurrencyCode, DashboardStats, Invoice, InvoiceStatus, MonthlyIncomePoint } from '../types';
 
 interface BackendRecentInvoice {
@@ -121,18 +122,38 @@ function normalizeDashboardResponse(b: BackendDashboardResponse): DashboardStats
   };
 }
 
+const inFlightStats = new Map<string, Promise<DashboardStats>>();
+
 export const dashboardService = {
   /**
    * Fetches aggregated dashboard statistics from GET /api/dashboard/stats.
    * Derives all KPIs, timeline data, and recent invoices from the backend.
+   * Uses in-flight deduplication to eliminate duplicate requests during navigation.
    */
   async getDashboardStats(months: number = 6): Promise<DashboardStats> {
-    const response = await apiClient.get<BackendDashboardResponse>('/dashboard/stats', {
-      params: {
-        months: Math.min(Math.max(months, 1), 24),
-      },
-    });
+    const clampedMonths = Math.min(Math.max(months, 1), 24);
+    const currentToken = getAuthToken();
+    const key = `${currentToken || 'anon'}:${clampedMonths}`;
 
-    return normalizeDashboardResponse(response);
+    const existing = inFlightStats.get(key);
+    if (existing) {
+      return existing;
+    }
+
+    const promise = (async () => {
+      try {
+        const response = await apiClient.get<BackendDashboardResponse>('/dashboard/stats', {
+          params: {
+            months: clampedMonths,
+          },
+        });
+        return normalizeDashboardResponse(response);
+      } finally {
+        inFlightStats.delete(key);
+      }
+    })();
+
+    inFlightStats.set(key, promise);
+    return promise;
   },
 };

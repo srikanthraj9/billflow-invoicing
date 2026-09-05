@@ -38,6 +38,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Remove ugly browser number spinners for clean financial inputs */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* Subtle Scrollbar for Table Containers & Drawers */
 ::-webkit-scrollbar {
   width: 6px;

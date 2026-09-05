@@ -10,15 +10,17 @@ export interface DashboardStatsProps {
 
 export function DashboardStats({ stats }: DashboardStatsProps) {
   const currency = stats.currency || 'INR';
+  const hasOverdue = stats.totalOverdue > 0;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-      {/* 1. Total Earned */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      {/* 1. Total Earned - Anchoring Primary KPI */}
       <StatCard
         label="Total Earned"
         value={formatCurrency(stats.totalEarned, currency)}
         variant="emerald"
         icon={TrendingUp}
+        isPrimary={true}
         trend={{
           value: '+14.2%',
           isPositive: true,
@@ -35,14 +37,15 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
         subtext={`${stats.pendingInvoicesCount ?? 1} invoice pending payment`}
       />
 
-      {/* 3. Overdue */}
+      {/* 3. Overdue - Highlights softly ONLY if overdue > 0 */}
       <StatCard
         label="Overdue"
         value={formatCurrency(stats.totalOverdue, currency)}
-        variant="rose"
+        variant={hasOverdue ? 'rose' : 'neutral'}
         icon={AlertCircle}
+        className={hasOverdue ? 'border-rose-200 bg-rose-50/15' : undefined}
         trend={
-          stats.totalOverdue > 0
+          hasOverdue
             ? {
                 value: `${stats.overdueInvoicesCount ?? 1} overdue`,
                 isPositive: false,
@@ -50,7 +53,7 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
               }
             : undefined
         }
-        subtext={stats.totalOverdue === 0 ? 'All invoices are up to date' : undefined}
+        subtext={!hasOverdue ? 'All invoices are up to date' : undefined}
       />
 
       {/* 4. Total Invoices */}

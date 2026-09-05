@@ -23,6 +23,8 @@ interface BackendTokenResponse {
 }
 
 let cachedUser: User | null = null;
+let cachedUserToken: string | null = null;
+let currentUserPromise: Promise<User | null> | null = null;
 
 function normalizeUser(backendUser: BackendUserResponse): User {
   const displayName = backendUser.full_name?.trim() || backendUser.email.split('@')[0];
@@ -42,32 +44,49 @@ function normalizeUser(backendUser: BackendUserResponse): User {
 export const authService = {
   /**
    * Retrieves the current authenticated user profile from backend GET /auth/me.
+   * Uses in-flight Promise deduplication so simultaneous component calls spawn only 1 HTTP request.
    * Returns null if not authenticated or if token is expired/invalid.
    */
   async getCurrentUser(): Promise<User | null> {
-    if (!hasAuthToken()) {
+    const token = getAuthToken();
+    if (!token) {
       cachedUser = null;
+      cachedUserToken = null;
+      currentUserPromise = null;
       return null;
     }
 
-    if (cachedUser) {
+    if (cachedUser && cachedUserToken === token) {
       return cachedUser;
     }
 
-    try {
-      const backendUser = await apiClient.get<BackendUserResponse>('/auth/me');
-      cachedUser = normalizeUser(backendUser);
-      return cachedUser;
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        removeAuthToken();
+    if (currentUserPromise) {
+      return currentUserPromise;
+    }
+
+    currentUserPromise = (async () => {
+      try {
+        const backendUser = await apiClient.get<BackendUserResponse>('/auth/me');
+        cachedUser = normalizeUser(backendUser);
+        cachedUserToken = token;
+        return cachedUser;
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) {
+          removeAuthToken();
+          cachedUser = null;
+          cachedUserToken = null;
+          return null;
+        }
+        // If network fails, clear cache and return null safely
         cachedUser = null;
+        cachedUserToken = null;
         return null;
+      } finally {
+        currentUserPromise = null;
       }
-      // If network fails, clear cache and return null safely
-      cachedUser = null;
-      return null;
-    }
+    })();
+
+    return currentUserPromise;
   },
 
   /**
@@ -89,6 +108,7 @@ export const authService = {
 
     setAuthToken(tokenResponse.access_token);
     cachedUser = normalizeUser(tokenResponse.user);
+    cachedUserToken = tokenResponse.access_token;
     return cachedUser;
   },
 
@@ -129,6 +149,8 @@ export const authService = {
   async logout(): Promise<void> {
     removeAuthToken();
     cachedUser = null;
+    cachedUserToken = null;
+    currentUserPromise = null;
 
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
@@ -147,5 +169,7 @@ export const authService = {
    */
   clearUserCache(): void {
     cachedUser = null;
+    cachedUserToken = null;
+    currentUserPromise = null;
   },
 };

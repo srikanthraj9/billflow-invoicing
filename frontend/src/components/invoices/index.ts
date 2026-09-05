@@ -10,3 +10,4 @@ export * from './InvoiceFormSkeleton';
 export * from './InvoiceDocument';
 export * from './ShareInvoiceModal';
 export * from './InvoiceDetailSkeleton';
+export * from './PaymentLinkModal';

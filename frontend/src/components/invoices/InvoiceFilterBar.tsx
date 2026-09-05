@@ -56,10 +56,10 @@ export function InvoiceFilterBar({
   ];
 
   return (
-    <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs">
-      {/* Top Row: Search & Count */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="w-full sm:max-w-md">
+    <div className="space-y-3 bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/90 shadow-2xs">
+      {/* Tier 1: Search Bar & Status Tabs */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div className="w-full lg:max-w-xs xl:max-w-sm shrink-0">
           <SearchInput
             value={filters.search || ''}
             onChange={(e) => onFilterChange({ search: e.target.value })}
@@ -68,8 +68,71 @@ export function InvoiceFilterBar({
           />
         </div>
 
-        <div className="flex items-center justify-between sm:justify-end gap-2 text-xs text-slate-500">
-          <span className="font-semibold bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200/60 text-slate-700">
+        {/* Status Filter Tabs with Pill Badges */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar text-xs">
+          {statusTabs.map((tab) => {
+            const isActive = (filters.status || 'all') === tab.id;
+            const count = statusCounts ? statusCounts[tab.id] : undefined;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => onFilterChange({ status: tab.id })}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 cursor-pointer text-xs',
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-xs font-semibold'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
+                )}
+              >
+                <span>{tab.label}</span>
+                {count !== undefined && (
+                  <span
+                    className={cn(
+                      'px-1.5 py-0.5 rounded-full text-[10px] font-bold tabular-nums leading-none',
+                      isActive ? 'bg-indigo-700/90 text-white' : 'bg-slate-200/90 text-slate-600'
+                    )}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Tier 2: Client & Sort Controls + Count / Clear Filter */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 pt-2.5 border-t border-slate-100">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
+          {/* Client Filter */}
+          <div className="w-full sm:w-60">
+            <Select
+              value={filters.clientId || ''}
+              onChange={(e) => onFilterChange({ clientId: e.target.value || undefined })}
+              options={clientOptions}
+              className="text-xs h-9"
+            />
+          </div>
+
+          {/* Sort Filter */}
+          <div className="w-full sm:w-44">
+            <Select
+              value={filters.sortBy || 'newest'}
+              onChange={(e) =>
+                onFilterChange({
+                  sortBy: e.target.value as InvoiceFilters['sortBy'],
+                })
+              }
+              options={sortOptions}
+              className="text-xs h-9"
+            />
+          </div>
+        </div>
+
+        {/* Count Summary & Clear Action */}
+        <div className="flex items-center justify-between sm:justify-end gap-2 text-xs text-slate-500 shrink-0 pt-1 sm:pt-0">
+          <span className="font-semibold bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200/70 text-slate-600 text-[11px] tabular-nums">
             {isFiltered ? `${filteredCount} of ${totalCount} invoices` : `${totalCount} invoices`}
           </span>
 
@@ -77,69 +140,13 @@ export function InvoiceFilterBar({
             <button
               type="button"
               onClick={onClearFilters}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline px-2 py-1 cursor-pointer"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline px-2 py-1 cursor-pointer transition-colors"
             >
               <X className="h-3.5 w-3.5" />
               <span>Clear filters</span>
             </button>
           )}
         </div>
-      </div>
-
-      {/* Middle Row: Status Filter Pills with Numerical Count Badges */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 no-scrollbar text-xs border-t border-slate-100">
-        {statusTabs.map((tab) => {
-          const isActive = (filters.status || 'all') === tab.id;
-          const count = statusCounts ? statusCounts[tab.id] : undefined;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => onFilterChange({ status: tab.id })}
-              className={cn(
-                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 cursor-pointer text-xs',
-                isActive
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
-              )}
-            >
-              <span>{tab.label}</span>
-              {count !== undefined && (
-                <span
-                  className={cn(
-                    'px-1.5 py-0.5 rounded-full text-[10px] font-bold tabular-nums leading-none',
-                    isActive ? 'bg-indigo-700/80 text-white' : 'bg-slate-200 text-slate-700'
-                  )}
-                >
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Bottom Filter Controls Row: Client & Sort Dropdowns */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 border-t border-slate-100">
-        {/* Client Filter */}
-        <Select
-          value={filters.clientId || ''}
-          onChange={(e) => onFilterChange({ clientId: e.target.value || undefined })}
-          options={clientOptions}
-          className="text-xs"
-        />
-
-        {/* Sort Filter */}
-        <Select
-          value={filters.sortBy || 'newest'}
-          onChange={(e) =>
-            onFilterChange({
-              sortBy: e.target.value as InvoiceFilters['sortBy'],
-            })
-          }
-          options={sortOptions}
-          className="text-xs"
-        />
       </div>
     </div>
   );

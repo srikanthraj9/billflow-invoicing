@@ -1,11 +1,16 @@
+import secrets
+import uuid
 from datetime import date, datetime, timezone
 from typing import Optional
+from decimal import Decimal
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.invoice import Invoice
+from app.models.payment import Payment
 from app.models.business_settings import BusinessSettings
 from app.core.finance import compute_effective_status
+from app.schemas.payment import PaymentCreateRequest
 from app.schemas.public_invoice import (
     PublicInvoiceItemResponse,
     PublicClientResponse,
@@ -14,7 +19,12 @@ from app.schemas.public_invoice import (
 )
 
 
-def _build_public_response(db: Session, invoice: Invoice, effective_status: str) -> PublicInvoiceResponse:
+def _build_public_response(
+    db: Session,
+    invoice: Invoice,
+    effective_status: str,
+    payment: Optional[Payment] = None,
+) -> PublicInvoiceResponse:
     """Helper to assemble a PublicInvoiceResponse from an Invoice model and its relations."""
     # Fetch merchant business settings
     biz = (
@@ -50,6 +60,18 @@ def _build_public_response(db: Session, invoice: Invoice, effective_status: str)
         for item in (invoice.items or [])
     ]
 
+    # Resolve authoritative payment details if paid
+    if payment is None and effective_status == "paid":
+        payment = (
+            db.query(Payment)
+            .filter(Payment.invoice_id == invoice.id, Payment.status == "completed")
+            .order_by(Payment.paid_at.desc(), Payment.created_at.desc())
+            .first()
+        )
+
+    payment_method = payment.method if payment else None
+    payment_reference = payment.reference if payment else None
+
     return PublicInvoiceResponse(
         invoice_number=invoice.invoice_number,
         status=effective_status,
@@ -62,6 +84,8 @@ def _build_public_response(db: Session, invoice: Invoice, effective_status: str)
         tax=invoice.tax,
         total=invoice.total,
         paid_at=invoice.paid_at,
+        payment_method=payment_method,
+        payment_reference=payment_reference,
         items=items_resp,
         client=client_resp,
         business=business_resp,
@@ -102,55 +126,99 @@ def get_public_invoice_by_token(db: Session, token: str) -> PublicInvoiceRespons
     return _build_public_response(db, invoice, effective_status)
 
 
-def pay_public_invoice(db: Session, token: str) -> PublicInvoiceResponse:
+def pay_public_invoice(
+    db: Session,
+    token: str,
+    payment_data: Optional[PaymentCreateRequest] = None,
+) -> PublicInvoiceResponse:
     """
-    Public payment simulation with row-level locking (SELECT ... FOR UPDATE).
+    Public payment transaction with row-level locking (SELECT ... FOR UPDATE).
     - Unknown token -> 404
     - Draft invoice -> 404 (do not reveal draft existence)
-    - Sent / Overdue invoice -> mark paid, set paid_at = now(UTC)
+    - Sent / Overdue invoice -> mark paid, set paid_at = now(UTC), create exactly ONE payment record
     - Paid invoice -> 400 "Invoice is already paid"
+    - Atomic transaction: rollback both on any error.
     - Concurrency-safe: atomic transaction prevents double payment.
     """
-    # 1. Acquire row lock within atomic transaction (no outer joins on with_for_update)
-    invoice = (
-        db.query(Invoice)
-        .filter(Invoice.public_token == token)
-        .with_for_update()
-        .first()
-    )
-    if not invoice:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invoice not found",
+    try:
+        # 1. Acquire row lock within atomic transaction (no outer joins on with_for_update)
+        invoice = (
+            db.query(Invoice)
+            .filter(Invoice.public_token == token)
+            .with_for_update()
+            .first()
+        )
+        if not invoice:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Invoice not found",
+            )
+
+        # 2. Evaluate status
+        effective_status = compute_effective_status(invoice.status, invoice.due_date)
+
+        if effective_status == "draft":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Invoice not found",
+            )
+
+        if effective_status == "paid":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invoice is already paid",
+            )
+
+        # 3. Validate payment input
+        method = "UPI"
+        if payment_data:
+            if payment_data.method:
+                method = payment_data.method
+            if payment_data.amount is not None:
+                # Amount must match invoice total
+                if payment_data.amount != invoice.total:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Payment amount ({payment_data.amount}) does not match invoice total ({invoice.total}).",
+                    )
+
+        # 4. Generate unique backend reference & server UTC timestamp
+        reference = f"BF-{secrets.token_hex(6).upper()}"
+        now_utc = datetime.now(timezone.utc)
+
+        # 5. Create Payment record
+        payment = Payment(
+            id=uuid.uuid4(),
+            invoice_id=invoice.id,
+            amount=invoice.total,
+            method=method,
+            status="completed",
+            reference=reference,
+            paid_at=now_utc,
+            created_at=now_utc,
+        )
+        db.add(payment)
+
+        # 6. Transition invoice to paid
+        invoice.status = "paid"
+        invoice.paid_at = now_utc
+
+        # 7. Commit atomically
+        db.commit()
+
+        # 8. Reload invoice with client and items for response
+        reloaded_invoice = (
+            db.query(Invoice)
+            .options(joinedload(Invoice.client), selectinload(Invoice.items))
+            .filter(Invoice.id == invoice.id)
+            .one()
         )
 
-    # 2. Evaluate status
-    effective_status = compute_effective_status(invoice.status, invoice.due_date)
-
-    if effective_status == "draft":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invoice not found",
-        )
-
-    if effective_status == "paid":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invoice is already paid",
-        )
-
-    # 3. Transition to paid
-    invoice.status = "paid"
-    invoice.paid_at = datetime.now(timezone.utc)
-    db.commit()
-
-    # 4. Reload invoice with client and items for response
-    reloaded_invoice = (
-        db.query(Invoice)
-        .options(joinedload(Invoice.client), selectinload(Invoice.items))
-        .filter(Invoice.id == invoice.id)
-        .one()
-    )
-
-    # 5. Return updated public representation
-    return _build_public_response(db, reloaded_invoice, "paid")
+        # 9. Return updated public representation with authoritative payment details
+        return _build_public_response(db, reloaded_invoice, "paid", payment=payment)
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise

@@ -56,6 +56,24 @@ export function formatDate(dateInput: string | Date | undefined): string {
 }
 
 /**
+ * Formats ISO or standard date strings to human-readable date and time format (e.g., "Sep 05, 2026, 11:20 AM").
+ */
+export function formatDateTime(dateInput: string | Date | undefined): string {
+  if (!dateInput) return '-';
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  if (isNaN(date.getTime())) return String(dateInput);
+
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+/**
  * Calculates subtotal, discount, tax, and total for invoice line items.
  */
 export function calculateInvoiceTotals(

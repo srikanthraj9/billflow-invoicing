@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/Toast';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { BusinessProfileForm } from './BusinessProfileForm';
 import { InvoicePreferencesForm } from './InvoicePreferencesForm';
+import { PaymentSettingsForm } from './PaymentSettingsForm';
 import { SettingsPreview } from './SettingsPreview';
 import { SettingsSkeleton } from './SettingsSkeleton';
 import { BusinessSettings, CurrencyCode } from '@/lib/types';
@@ -232,6 +233,8 @@ export function SettingsContainer() {
             }}
             disabled={isSaving}
           />
+
+          <PaymentSettingsForm />
         </div>
 
         {/* Right Column (1/3): Sticky Live Invoice Preview */}

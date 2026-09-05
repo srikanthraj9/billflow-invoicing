@@ -4,6 +4,7 @@
  */
 
 import { apiClient, ApiError } from '../api-client';
+import { getAuthToken } from '../auth-token';
 import { Client, ClientFilters } from '../types';
 
 interface BackendClientResponse {
@@ -41,10 +42,13 @@ function normalizeClient(b: BackendClientResponse): Client {
   };
 }
 
+let inFlightClientsPromise: Promise<Client[]> | null = null;
+let inFlightClientsKey = '';
+
 export const clientService = {
   /**
    * Fetches all clients for the authenticated user from GET /api/clients.
-   * Performs server-side search, sorting, and pagination.
+   * Performs server-side search, sorting, and pagination with in-flight deduplication.
    */
   async getClients(filters?: ClientFilters): Promise<Client[]> {
     const params: Record<string, string | number | boolean | undefined | null> = {
@@ -62,11 +66,26 @@ export const clientService = {
       params.sort_by = 'name';
     }
 
-    const response = await apiClient.get<BackendClientListResponse>('/clients', {
-      params,
-    });
+    const currentToken = getAuthToken();
+    const key = `${currentToken || 'anon'}:${JSON.stringify(params)}`;
+    if (inFlightClientsPromise && inFlightClientsKey === key) {
+      return inFlightClientsPromise;
+    }
 
-    return response.items.map(normalizeClient);
+    inFlightClientsKey = key;
+    inFlightClientsPromise = (async () => {
+      try {
+        const response = await apiClient.get<BackendClientListResponse>('/clients', {
+          params,
+        });
+        return response.items.map(normalizeClient);
+      } finally {
+        inFlightClientsPromise = null;
+        inFlightClientsKey = '';
+      }
+    })();
+
+    return inFlightClientsPromise;
   },
 
   /**

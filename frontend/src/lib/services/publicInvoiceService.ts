@@ -49,6 +49,8 @@ export interface BackendPublicInvoiceResponse {
   tax: number | string;
   total: number | string;
   paid_at?: string | null;
+  payment_method?: string | null;
+  payment_reference?: string | null;
   items: BackendPublicItem[];
   client: BackendPublicClient;
   business: BackendPublicBusiness;
@@ -100,6 +102,8 @@ function normalizePublicData(b: BackendPublicInvoiceResponse, token: string): Pu
     notes: b.notes || undefined,
     status: b.status as InvoiceStatus,
     paidAt: b.paid_at || undefined,
+    paymentMethod: b.payment_method || undefined,
+    paymentReference: b.payment_reference || undefined,
     createdAt: b.issue_date,
     updatedAt: b.paid_at || b.issue_date,
   };
@@ -142,19 +146,29 @@ export const publicInvoiceService = {
   },
 
   /**
-   * Simulates payment for public invoice via POST /api/public/invoices/{token}/pay.
+   * Processes payment for public invoice via POST /api/public/invoices/{token}/pay.
    * Bypasses JWT authentication header.
-   * Sends NO payment credentials or request body.
+   * Passes selected payment method (UPI, Card, Net Banking).
    * Returns updated authoritative invoice.
    */
-  async payPublicInvoice(token: string): Promise<Invoice> {
+  async payPublicInvoice(
+    token: string,
+    payload?: { method?: string; amount?: number }
+  ): Promise<Invoice> {
     if (!token || !token.trim()) {
       throw new Error('Public token is required to process payment.');
     }
 
+    const body = payload
+      ? {
+          method: payload.method || 'UPI',
+          ...(payload.amount !== undefined ? { amount: payload.amount } : {}),
+        }
+      : undefined;
+
     const response = await apiClient.post<BackendPublicInvoiceResponse>(
       `/public/invoices/${encodeURIComponent(token.trim())}/pay`,
-      undefined,
+      body,
       { skipAuth: true }
     );
 

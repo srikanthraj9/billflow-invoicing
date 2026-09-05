@@ -30,6 +30,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.sqlite3
+test-results/
 
 # Next.js Build Output
 .next/
